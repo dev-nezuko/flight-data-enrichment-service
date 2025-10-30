@@ -88,7 +88,8 @@ WSGI_APPLICATION = "backend.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        # Compose points this at a volume shared by the API, worker and pages.
+        "NAME": os.getenv("SQLITE_PATH") or BASE_DIR / "db.sqlite3",
     }
 }
 
