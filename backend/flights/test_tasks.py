@@ -1,5 +1,6 @@
 """Worker behaviour against a faked provider; no network or broker is used."""
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import Mock, patch
@@ -105,3 +106,27 @@ class EnrichFlightTaskTests(TestCase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.status, "FAILURE")
         self.assertIn("missing", self.task.result["error"])
+
+    def test_provider_url_with_key_is_not_logged(self):
+        transport = httpx.MockTransport(lambda request: httpx.Response(200, json=SEARCH_FIXTURE))
+        real_client = httpx.Client
+        records = []
+        handler = logging.Handler()
+        handler.emit = records.append
+        httpx_logger = logging.getLogger("httpx")
+        httpx_logger.addHandler(handler)
+        root = logging.getLogger()
+        root_level = root.level
+        root.setLevel(logging.INFO)  # what `celery worker --loglevel=info` does
+        try:
+            with patch(
+                "flights.tasks.httpx.Client",
+                side_effect=lambda **kw: real_client(transport=transport, **kw),
+            ):
+                enrich_flight_task.apply(args=["fixture-flight"], task_id="fixture-task")
+        finally:
+            root.setLevel(root_level)
+            httpx_logger.removeHandler(handler)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, "SUCCESS")
+        self.assertEqual([r for r in records if "placeholder-key" in r.getMessage()], [])
