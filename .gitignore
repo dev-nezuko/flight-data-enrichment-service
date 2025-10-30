@@ -1,0 +1,37 @@
+# Local virtualenvs
+fly/
+project_venv/
+.venv/
+venv/
+node_modules/
+
+# Python caches and tooling output
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Build output
+build/
+dist/
+*.egg-info/
+
+# Local data and secrets
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Logs and scratch
+*.log
+logs/
+tmp/
+celerybeat-schedule*
+
+# Editor/OS
+.DS_Store
+.github/
