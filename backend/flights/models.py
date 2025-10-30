@@ -22,7 +22,8 @@ class Flight(models.Model):
 class EnrichmentTask(models.Model):
     task_id = models.CharField(max_length=255, unique=True)
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE)
-    status = models.CharField(max_length=20, default='PENDING')  # PENDING, STARTED, SUCCESS, FAILURE
+    # PENDING, STARTED, SUCCESS or FAILURE, written by the API and the worker
+    status = models.CharField(max_length=20, default="PENDING")
     result = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)

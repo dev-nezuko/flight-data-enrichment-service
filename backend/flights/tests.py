@@ -1,28 +1,16 @@
-# Standard library imports
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch
 
-# Third-party imports
-import httpx
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-# Local application imports
-from .models import Flight, EnrichmentTask
-from .tasks import enrich_flight_task
+from .models import EnrichmentTask, Flight
 from .utils import extract_retail_price
 
-class BaseTestCase(TestCase):
-    def setUp(self):
-        # Clear the database before each test
-        Flight.objects.all().delete()
-        EnrichmentTask.objects.all().delete()
 
-class FlightModelTests(BaseTestCase):
+class FlightModelTests(TestCase):
     def setUp(self):
-        super().setUp()  # Call parent's setUp to clear database
         self.flight_data = {
             "flight_id": "test-flight-1",
             "travel_class": "Business",
@@ -45,7 +33,7 @@ class FlightModelTests(BaseTestCase):
                     "distance": 5614,
                 }
             ],
-            "last_seen": timezone.now()
+            "last_seen": timezone.now(),
         }
 
     def test_flight_creation(self):
@@ -59,9 +47,9 @@ class FlightModelTests(BaseTestCase):
         flight = Flight.objects.create(**self.flight_data)
         self.assertEqual(str(flight), self.flight_data["flight_id"])
 
-class EnrichmentTaskModelTests(BaseTestCase):
+
+class EnrichmentTaskModelTests(TestCase):
     def setUp(self):
-        super().setUp()  # Call parent's setUp to clear database
         self.flight = Flight.objects.create(
             flight_id="test-flight",
             travel_class="Economy",
@@ -71,14 +59,12 @@ class EnrichmentTaskModelTests(BaseTestCase):
             arrival_time=timezone.now() + timedelta(hours=6),
             flight_numbers=["AA123"],
             legs=[],
-            last_seen=timezone.now()
+            last_seen=timezone.now(),
         )
 
     def test_task_creation(self):
         task = EnrichmentTask.objects.create(
-            task_id="test-task-id",
-            flight=self.flight,
-            status="PENDING"
+            task_id="test-task-id", flight=self.flight, status="PENDING"
         )
         self.assertEqual(task.status, "PENDING")
         self.assertIsNone(task.result)
@@ -87,15 +73,13 @@ class EnrichmentTaskModelTests(BaseTestCase):
 
     def test_task_str_representation(self):
         task = EnrichmentTask.objects.create(
-            task_id="test-task-id",
-            flight=self.flight,
-            status="PENDING"
+            task_id="test-task-id", flight=self.flight, status="PENDING"
         )
         self.assertEqual(str(task), "Task test-task-id - PENDING")
 
-class FlightModelValidationTests(BaseTestCase):
+
+class FlightModelValidationTests(TestCase):
     def setUp(self):
-        super().setUp()  # Call parent's setUp to clear database
         self.valid_flight_data = {
             "flight_id": "test-flight-2",
             "travel_class": "Business",
@@ -118,17 +102,17 @@ class FlightModelValidationTests(BaseTestCase):
                     "distance": 5614,
                 }
             ],
-            "last_seen": timezone.now()
+            "last_seen": timezone.now(),
         }
 
     def test_valid_flight_creation(self):
         flight = Flight.objects.create(**self.valid_flight_data)
-        flight.full_clean()  # Validates all fields
+        flight.full_clean()
         self.assertEqual(flight.flight_id, self.valid_flight_data["flight_id"])
 
-class EnrichmentTaskLogicTests(BaseTestCase):
+
+class EnrichmentTaskLogicTests(TestCase):
     def setUp(self):
-        super().setUp()  # Call parent's setUp to clear database
         self.flight = Flight.objects.create(
             flight_id="test-flight",
             travel_class="Economy",
@@ -137,47 +121,45 @@ class EnrichmentTaskLogicTests(BaseTestCase):
             departure_time=timezone.now(),
             arrival_time=timezone.now() + timedelta(hours=6),
             flight_numbers=["AA123"],
-            legs=[{
-                "origin": "JFK",
-                "destination": "LAX",
-                "departure_time": timezone.now().isoformat(),
-                "arrival_time": (timezone.now() + timedelta(hours=6)).isoformat(),
-                "flight_number": "AA123",
-                "aircraft_type": "Boeing 737",
-                "cabin_type": "Economy",
-                "duration": 360,
-                "layover_time": 0.0,
-                "distance": 2475
-            }],
-            last_seen=timezone.now()
+            legs=[
+                {
+                    "origin": "JFK",
+                    "destination": "LAX",
+                    "departure_time": timezone.now().isoformat(),
+                    "arrival_time": (timezone.now() + timedelta(hours=6)).isoformat(),
+                    "flight_number": "AA123",
+                    "aircraft_type": "Boeing 737",
+                    "cabin_type": "Economy",
+                    "duration": 360,
+                    "layover_time": 0.0,
+                    "distance": 2475,
+                }
+            ],
+            last_seen=timezone.now(),
         )
         self.task = EnrichmentTask.objects.create(
-            task_id="test-task-id",
-            flight=self.flight,
-            status="PENDING"
+            task_id="test-task-id", flight=self.flight, status="PENDING"
         )
 
     def test_task_result_storage(self):
-        # Test storing valid result
         result = {"retail_price": 500.00}
         self.task.result = result
         self.task.save()
         self.assertEqual(self.task.result, result)
 
     def test_task_state_transitions(self):
-        # Test PENDING to STARTED
-        self.task.status = 'STARTED'
+        self.task.status = "STARTED"
         self.task.save()
-        self.assertEqual(self.task.status, 'STARTED')
-        
-        # Test STARTED to SUCCESS
-        self.task.status = 'SUCCESS'
+        self.assertEqual(self.task.status, "STARTED")
+
+        self.task.status = "SUCCESS"
         self.task.completed_at = timezone.now()
         self.task.save()
-        self.assertEqual(self.task.status, 'SUCCESS')
+        self.assertEqual(self.task.status, "SUCCESS")
         self.assertIsNotNone(self.task.completed_at)
 
-class ExtractRetailPriceTests(BaseTestCase):
+
+class ExtractRetailPriceTests(TestCase):
     def test_empty_flights(self):
         data = {"best_flights": []}
         self.assertIsNone(extract_retail_price(data))
@@ -195,7 +177,8 @@ class ExtractRetailPriceTests(BaseTestCase):
         data = {"best_flights": [{"price": 500.00}]}
         self.assertEqual(extract_retail_price(data), 500.00)
 
-class EdgeCaseTests(BaseTestCase):
+
+class EdgeCaseTests(TestCase):
     def test_concurrent_task_creation(self):
         flight = Flight.objects.create(
             flight_id="test-flight",
@@ -206,23 +189,19 @@ class EdgeCaseTests(BaseTestCase):
             arrival_time=timezone.now() + timedelta(hours=6),
             flight_numbers=["AA123"],
             legs=[],
-            last_seen=timezone.now()
+            last_seen=timezone.now(),
         )
 
-        # Create multiple tasks for the same flight
         task1 = EnrichmentTask.objects.create(task_id="task1", flight=flight, status="PENDING")
         task2 = EnrichmentTask.objects.create(task_id="task2", flight=flight, status="PENDING")
-        
-        # Verify both tasks exist
+
         self.assertEqual(EnrichmentTask.objects.filter(flight=flight).count(), 2)
-        
-        # Update tasks concurrently
+
         task1.status = "SUCCESS"
         task1.save()
         task2.status = "FAILURE"
         task2.save()
-        
-        # Verify final states
+
         self.assertEqual(EnrichmentTask.objects.get(task_id="task1").status, "SUCCESS")
         self.assertEqual(EnrichmentTask.objects.get(task_id="task2").status, "FAILURE")
 
@@ -246,10 +225,10 @@ class EdgeCaseTests(BaseTestCase):
                     "cabin_type": "Economy",
                     "duration": 360,
                     "layover_time": 0.0,
-                    "distance": 2475
+                    "distance": 2475,
                 }
             ],
-            "last_seen": timezone.now()
+            "last_seen": timezone.now(),
         }
         flight = Flight.objects.create(**flight_data)
         flight.full_clean()
@@ -263,23 +242,24 @@ class EdgeCaseTests(BaseTestCase):
             departure_time=timezone.now(),
             arrival_time=timezone.now() + timedelta(hours=6),
             flight_numbers=["AA123"],
-            legs=[{
-                "origin": "JFK",
-                "destination": "LAX",
-                "departure_time": timezone.now().isoformat(),
-                "arrival_time": (timezone.now() + timedelta(hours=6)).isoformat(),
-                "flight_number": "AA123",
-                "aircraft_type": "Boeing 737",
-                "cabin_type": "Economy",
-                "duration": 360,
-                "layover_time": 0.0,
-                "distance": 2475
-            }],
-            last_seen=timezone.now()
+            legs=[
+                {
+                    "origin": "JFK",
+                    "destination": "LAX",
+                    "departure_time": timezone.now().isoformat(),
+                    "arrival_time": (timezone.now() + timedelta(hours=6)).isoformat(),
+                    "flight_number": "AA123",
+                    "aircraft_type": "Boeing 737",
+                    "cabin_type": "Economy",
+                    "duration": 360,
+                    "layover_time": 0.0,
+                    "distance": 2475,
+                }
+            ],
+            last_seen=timezone.now(),
         )
 
-        # Test maximum allowed price
-        flight.retail_price = Decimal('99999999.99')
+        flight.retail_price = Decimal("99999999.99")
         flight.full_clean()
 
     def test_flight_without_legs_is_valid(self):
@@ -332,15 +312,14 @@ class EdgeCaseTests(BaseTestCase):
                     "cabin_type": "Economy",
                     "duration": 360,
                     "layover_time": 0.0,
-                    "distance": 2475
+                    "distance": 2475,
                 }
             ],
-            "last_seen": timezone.now()
+            "last_seen": timezone.now(),
         }
         flight = Flight.objects.create(**flight_data)
         flight.full_clean()
 
-        # Test exceeding max length
         with self.assertRaises(ValidationError):
             flight.flight_id = "x" * 101
             flight.full_clean()
