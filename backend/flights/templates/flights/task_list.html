@@ -1,31 +1,30 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Last 3 Completed Tasks</title>
-</head>
-<body>
-    <h1>Last 3 Completed Tasks</h1>
-    <table border="1" cellpadding="5" cellspacing="0">
-        <thead>
-            <tr>
-                <th>Task ID</th>
-                <th>Flight ID</th>
-                <th>Result Status</th>
-                <th>Completed At</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for task in tasks %}
-            <tr>
-                <td>{{ task.task_id }}</td>
-                <td>{{ task.flight.flight_id }}</td>
-                <td>{{ task.status }}</td>
-                <td>{{ task.completed_at }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5">No completed tasks found.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</body>
-</html>
+{% extends "flights/base.html" %}
+{% block title %}Last 3 completed tasks{% endblock %}
+{% block content %}
+<h1>Last 3 completed tasks</h1>
+<div class="table-wrap">
+<table>
+    <caption>Most recently finished enrichment tasks</caption>
+    <thead>
+        <tr>
+            <th scope="col">Task ID</th>
+            <th scope="col">Flight ID</th>
+            <th scope="col">Status</th>
+            <th scope="col">Completed (UTC)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for task in tasks %}
+        <tr>
+            <th scope="row">{{ task.task_id }}</th>
+            <td>{{ task.flight.flight_id }}</td>
+            <td>{{ task.status }}</td>
+            <td>{{ task.completed_at|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No completed tasks found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

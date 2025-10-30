@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Flights{% endblock %}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 1.5rem; color: #1b1f24; background: #fff; }
+        nav a { margin-right: 1rem; color: #0b5cad; }
+        .table-wrap { overflow-x: auto; }
+        table { border-collapse: collapse; min-width: 32rem; }
+        caption { text-align: left; margin-bottom: .5rem; color: #4a525c; }
+        th, td { border: 1px solid #c9ced4; padding: .4rem .6rem; text-align: left; }
+        th { background: #eef1f4; }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body>
+    <nav aria-label="Pages">
+        <a href="{% url 'flight-list' %}">Flights</a>
+        <a href="{% url 'task-list' %}">Recent tasks</a>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
