@@ -1,115 +1,91 @@
-# Standard library imports
-import os
-from typing import Dict, Any
+from typing import Any
 
-# Third-party imports
 import httpx
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
-from dotenv import load_dotenv
-from pathlib import Path
 
-# Local application imports
-from .models import Flight, EnrichmentTask
+from .models import EnrichmentTask, Flight
+from .utils import extract_retail_price
 
-# Load environment variables from .env file
-env_path = Path(__file__).resolve().parent.parent.parent / '.env'
-load_dotenv(env_path)
-
-from backend.settings import SERPAPI_KEY
-from flights.utils import extract_retail_price
+PROVIDER_TIMEOUT_SECONDS = 30
+RETRY_BASE_SECONDS = 60
 
 
+class EnrichmentError(Exception):
+    """A failure already recorded on the task row; retrying would not help."""
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_kwargs={'max_retries': 3, 'countdown': 60},
-    retry_backoff=True
-)
-def enrich_flight_task(self, flight_id: str) -> Dict[str, Any]:
-    """
-    Enrich flight data with retail price information.
-    
-    Args:
-        flight_id: The ID of the flight to enrich
-        
-    Returns:
-        Dict containing the retail price or error information
-        
-    Raises:
-        Flight.DoesNotExist: If flight is not found
-        MaxRetriesExceededError: If all retries are exhausted
-        ValueError: If API response is invalid
-    """
+
+def is_transient(exc: httpx.HTTPError) -> bool:
+    """Network faults, rate limits and provider 5xx are worth retrying; 4xx are not."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return True
+
+
+def build_search_params(flight: Flight, api_key: str) -> dict[str, Any]:
+    return {
+        "engine": "google_flights",
+        "departure_id": flight.origin,
+        "arrival_id": flight.destination,
+        "outbound_date": flight.departure_time.strftime("%Y-%m-%d"),
+        "type": 2,  # one-way; SerpApi would otherwise require a return_date
+        "currency": "USD",
+        "hl": "en",
+        "api_key": api_key,
+    }
+
+
+def finish(task_id: str, status: str, result: dict[str, Any]) -> None:
+    EnrichmentTask.objects.filter(task_id=task_id).update(
+        status=status, result=result, completed_at=timezone.now()
+    )
+
+
+def fail(task_id: str, message: str) -> EnrichmentError:
+    finish(task_id, "FAILURE", {"error": message})
+    return EnrichmentError(message)
+
+
+@shared_task(bind=True, max_retries=3)
+def enrich_flight_task(self, flight_id: str) -> dict[str, Any]:
+    task_id = self.request.id
+    EnrichmentTask.objects.filter(task_id=task_id).update(status="STARTED")
+
     try:
-        # Get flight data
         flight = Flight.objects.get(flight_id=flight_id)
-        task_obj = EnrichmentTask.objects.get(task_id=self.request.id)
-        
-        # Update task status to started
-        task_obj.status = 'STARTED'
-        task_obj.save()
+    except Flight.DoesNotExist:
+        raise fail(task_id, f"Flight with ID {flight_id} not found") from None
 
-        # Prepare API request parameters
-        params = {
-            "engine": "google_flights",
-            "departure_id": flight.origin,
-            "arrival_id": flight.destination,
-            "outbound_date": flight.departure_time.strftime("%Y-%m-%d"),
-            "type": 2,
-            "currency": "USD",
-            "hl": "en",
-            "api_key": SERPAPI_KEY
-        }
+    if not settings.SERPAPI_KEY:
+        raise fail(task_id, "SERPAPI_KEY is not configured")
 
-        # Make API request with timeout and retries
-        with httpx.Client(timeout=30) as client:
-            response = client.get("https://serpapi.com/search.json", params=params)
+    try:
+        with httpx.Client(timeout=PROVIDER_TIMEOUT_SECONDS) as client:
+            response = client.get(
+                settings.SERPAPI_URL, params=build_search_params(flight, settings.SERPAPI_KEY)
+            )
             response.raise_for_status()
             data = response.json()
+    except httpx.HTTPError as exc:
+        if is_transient(exc) and self.request.retries < self.max_retries:
+            raise self.retry(countdown=RETRY_BASE_SECONDS * 2**self.request.retries) from None
+        # Provider URLs carry the API key, so the exception text is never stored.
+        raise fail(task_id, "Flight price provider request failed") from None
+    except ValueError:
+        raise fail(task_id, "Flight price provider returned invalid JSON") from None
 
-        # Extract and validate retail price
+    try:
         retail_price = extract_retail_price(data)
+    except ValueError:
+        raise fail(task_id, "Flight price provider returned an invalid price") from None
 
-        # Update flight data
-        if retail_price is not None:
-            flight.retail_price = retail_price
-        flight.enriched = True
-        flight.save()
-
-        # Update task status
-        task_obj.status = 'SUCCESS'
-        task_obj.result = {"retail_price": retail_price}
-        task_obj.completed_at = timezone.now()
-        task_obj.save()
-
-        return {"retail_price": retail_price}
-
-    except Flight.DoesNotExist:
-        error_msg = f"Flight with ID {flight_id} not found"
-        task_obj = EnrichmentTask.objects.get(task_id=self.request.id)
-        task_obj.status = 'FAILURE'
-        task_obj.result = {"error": error_msg}
-        task_obj.completed_at = timezone.now()
-        task_obj.save()
-        raise
-
-    except httpx.HTTPError as e:
-        error_msg = "Flight price provider request failed"
-        if self.request.retries >= self.max_retries:
-            task_obj = EnrichmentTask.objects.get(task_id=self.request.id)
-            task_obj.status = 'FAILURE'
-            task_obj.result = {"error": error_msg}
-            task_obj.completed_at = timezone.now()
-            task_obj.save()
-        raise RuntimeError(error_msg) from None
-
-    except Exception as e:
-        error_msg = "Flight enrichment failed"
-        task_obj = EnrichmentTask.objects.get(task_id=self.request.id)
-        task_obj.status = 'FAILURE'
-        task_obj.result = {"error": error_msg}
-        task_obj.completed_at = timezone.now()
-        task_obj.save()
-        raise RuntimeError(error_msg) from None
+    Flight.objects.filter(pk=flight.pk).update(
+        retail_price=retail_price, enriched=retail_price is not None
+    )
+    result = {"retail_price": retail_price}
+    if retail_price is None:
+        result["detail"] = "No price in provider results"
+    finish(task_id, "SUCCESS", result)
+    return result

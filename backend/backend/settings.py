@@ -17,7 +17,8 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SERPAPI_KEY = os.getenv('SERPAPI_KEY')
+SERPAPI_KEY = os.getenv('SERPAPI_KEY', '')
+SERPAPI_URL = os.getenv('SERPAPI_URL', 'https://serpapi.com/search.json')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/

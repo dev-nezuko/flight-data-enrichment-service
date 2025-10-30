@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from unittest.mock import patch, Mock
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from flights.utils import extract_retail_price
 from flights.models import Flight, EnrichmentTask
 from flights.tasks import enrich_flight_task
@@ -12,6 +12,7 @@ class PriceSafetyTests(TestCase):
             with self.subTest(price=price), self.assertRaises(ValueError):
                 extract_retail_price({'best_flights': [{'price': price}]})
 
+    @override_settings(SERPAPI_KEY='placeholder-key')
     def test_mocked_one_way_search_and_result_storage(self):
         departure = datetime(2027, 1, 2, 10, tzinfo=timezone.utc)
         flight = Flight.objects.create(flight_id='synthetic', travel_class='Economy', origin='JFK', destination='LAX', departure_time=departure, arrival_time=departure, flight_numbers=['DEMO1'], legs=[], last_seen=departure)
