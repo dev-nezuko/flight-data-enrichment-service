@@ -9,7 +9,7 @@ class Flight(models.Model):
     departure_time = models.DateTimeField()
     arrival_time = models.DateTimeField()
     flight_numbers = models.JSONField()  # List of strings
-    legs = models.JSONField()            # List of dicts with leg info
+    legs = models.JSONField(blank=True)  # list of leg dicts; may be empty
     last_seen = models.DateTimeField()
 
     retail_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)

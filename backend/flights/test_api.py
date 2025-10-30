@@ -78,6 +78,7 @@ class EnrichFlightRouteTests(TransactionTestCase):
     def test_rejects_invalid_input_without_writing(self):
         bad_bodies = [
             payload(origin="New York"),
+            payload(origin="羽田"),
             payload(destination="lax"),
             payload(arrival_time="2027-01-02T09:00:00Z"),
             payload(id="x" * 101),

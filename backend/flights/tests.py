@@ -282,20 +282,34 @@ class EdgeCaseTests(BaseTestCase):
         flight.retail_price = Decimal('99999999.99')
         flight.full_clean()
 
-    def test_unicode_airport_codes(self):
-        flight_data = {
-            "flight_id": "test-flight",
-            "travel_class": "Economy",
-            "origin": "羽田",  # Japanese characters
-            "destination": "LAX",
-            "departure_time": timezone.now(),
-            "arrival_time": timezone.now() + timedelta(hours=6),
-            "flight_numbers": ["AA123"],
-            "legs": [],
-            "last_seen": timezone.now()
-        }
+    def test_flight_without_legs_is_valid(self):
+        # The API accepts "legs": [], so the admin must be able to save such a row too.
+        flight = Flight.objects.create(
+            flight_id="no-legs",
+            travel_class="Economy",
+            origin="JFK",
+            destination="LAX",
+            departure_time=timezone.now(),
+            arrival_time=timezone.now() + timedelta(hours=6),
+            flight_numbers=["AA123"],
+            legs=[],
+            last_seen=timezone.now(),
+        )
+        flight.full_clean()
+
+    def test_overlong_airport_code_is_rejected(self):
+        flight = Flight(
+            flight_id="long-code",
+            travel_class="Economy",
+            origin="X" * 11,
+            destination="LAX",
+            departure_time=timezone.now(),
+            arrival_time=timezone.now() + timedelta(hours=6),
+            flight_numbers=["AA123"],
+            legs=[],
+            last_seen=timezone.now(),
+        )
         with self.assertRaises(ValidationError):
-            flight = Flight.objects.create(**flight_data)
             flight.full_clean()
 
     def test_very_long_flight_id(self):
