@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flight Summary</title>
+</head>
+<body>
+    <h1>Flight Summary</h1>
+    <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+            <tr>
+                <th>Flight ID</th>
+                <th>Origin</th>
+                <th>Destination</th>
+                <th>Departure Time</th>
+                <th>Arrival Time</th>
+                <th>Travel Class</th>
+                <th>Retail Price</th>
+                <th>Enriched</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for flight in flights %}
+            <tr>
+                <td>{{ flight.flight_id }}</td>
+                <td>{{ flight.origin }}</td>
+                <td>{{ flight.destination }}</td>
+                <td>{{ flight.departure_time }}</td>
+                <td>{{ flight.arrival_time }}</td>
+                <td>{{ flight.travel_class }}</td>
+                <td>{% if flight.retail_price %}{{ flight.retail_price }}{% else %}N/A{% endif %}</td>
+                <td>{{ flight.enriched }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8">No flights found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

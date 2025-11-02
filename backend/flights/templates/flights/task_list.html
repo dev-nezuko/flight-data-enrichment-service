@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Last 3 Completed Tasks</title>
+</head>
+<body>
+    <h1>Last 3 Completed Tasks</h1>
+    <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+            <tr>
+                <th>Task ID</th>
+                <th>Flight ID</th>
+                <th>Result Status</th>
+                <th>Completed At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td>{{ task.task_id }}</td>
+                <td>{{ task.flight.flight_id }}</td>
+                <td>{{ task.status }}</td>
+                <td>{{ task.completed_at }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No completed tasks found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

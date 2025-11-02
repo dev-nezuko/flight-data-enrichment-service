@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+django
+celery[redis]
+redis
+httpx
+pytest
+python-dotenv
