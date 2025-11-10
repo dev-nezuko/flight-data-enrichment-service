@@ -12,6 +12,9 @@ This service enriches flight data with retail price information using the Google
 - [API Endpoints](#api-endpoints)
 - [Testing](#testing)
 - [Architecture](#architecture)
+- [Architecture Decisions](#architecture-decisions)
+- [Feature Implementation Details](#feature-implementation-details)
+- [Known Limitations and Future Improvements](#known-limitations-and-future-improvements)
 - [Troubleshooting](#troubleshooting)
 
 ## Features
@@ -204,6 +207,138 @@ The service uses a modern, scalable architecture:
 - **Celery**: Distributed task queue for async processing
 - **Redis**: Message broker and caching
 - **SQLite**: Development database (can be replaced with PostgreSQL for production)
+
+## Architecture Decisions
+
+### FastAPI + Django Combination
+- **Rationale**: We chose to combine FastAPI with Django to leverage the best of both frameworks:
+  - FastAPI provides high-performance async API capabilities and automatic OpenAPI documentation
+  - Django offers a mature ORM, robust admin interface, and battle-tested security features
+- **Trade-offs**:
+  - Increased complexity in project setup
+  - Better separation of concerns between API and data layers
+  - Future-proof architecture that can scale independently
+
+### Asynchronous Processing
+- **Why Celery**:
+  - Handles long-running flight data enrichment tasks without blocking API responses
+  - Provides reliable task queuing with retry mechanisms
+  - Supports task prioritization and scheduling
+- **Redis as Message Broker**:
+  - Low latency and high throughput
+  - Built-in persistence
+  - Excellent integration with Celery
+
+### Data Storage Strategy
+- **Current Implementation**:
+  - Uses SQLite for development simplicity
+  - Models designed for easy migration to PostgreSQL
+  - Structured for efficient querying of flight data
+- **Caching Layer**:
+  - Redis used for caching frequent queries
+  - Reduces load on the database
+  - Improves response times for repeated requests
+
+## Feature Implementation Details
+
+### Flight Data Enrichment
+1. **Data Reception**:
+   - Validates incoming flight data against JSON schema
+   - Normalizes dates and times to UTC
+   - Performs initial data quality checks
+
+2. **Task Processing**:
+   ```python
+   # Simplified flow
+   @celery_app.task(retry_policy={
+       'max_retries': 3,
+       'interval_start': 0,
+       'interval_step': 60,
+       'interval_max': 180,
+   })
+   def enrich_flight_data(flight_id):
+       # Fetch flight details
+       # Query SerpAPI
+       # Process and store results
+   ```
+
+3. **Price Enrichment Logic**:
+   - Queries Google Flights via SerpAPI
+   - Implements smart retry mechanism for rate limits
+   - Handles currency conversions and normalization
+
+### API Design
+1. **Endpoint Structure**:
+   - RESTful design principles
+   - Versioned endpoints for future compatibility
+   - Comprehensive error handling
+
+2. **Authentication & Security**:
+   - Token-based authentication
+   - Rate limiting per client
+   - Input validation and sanitization
+
+### Monitoring and Logging
+- Structured logging format
+- Performance metrics collection
+- Task queue monitoring
+
+## Known Limitations and Future Improvements
+
+### Current Limitations
+1. **SerpAPI Dependencies**:
+   - Rate limits on free tier
+   - Occasional inconsistency in price data
+   - Limited historical data access
+
+2. **Scalability Constraints**:
+   - Single Redis instance bottleneck
+   - SQLite limitations in concurrent writes
+   - Basic task prioritization
+
+3. **Feature Gaps**:
+   - Limited support for multi-currency
+   - Basic error recovery mechanisms
+   - Minimal analytics capabilities
+
+### Planned Improvements
+
+1. **Short-term (1-3 months)**:
+   - [ ] Migrate to PostgreSQL for production
+   - [ ] Implement Redis cluster for better scalability
+   - [ ] Add comprehensive monitoring dashboard
+   - [ ] Improve error handling and recovery
+   - [ ] Add support for multiple flight search providers
+
+2. **Medium-term (3-6 months)**:
+   - [ ] Implement advanced caching strategies
+   - [ ] Add real-time price update webhooks
+   - [ ] Develop analytics dashboard
+   - [ ] Add support for fare rules and conditions
+   - [ ] Implement A/B testing framework
+
+3. **Long-term (6+ months)**:
+   - [ ] Machine learning for price prediction
+   - [ ] Geographic distribution of services
+   - [ ] Advanced analytics and reporting
+   - [ ] Integration with additional data sources
+   - [ ] Custom pricing algorithms
+
+### Performance Optimization Plans
+1. **Database Optimization**:
+   - Implement database partitioning
+   - Optimize indexes for common queries
+   - Add materialized views for reports
+
+2. **Caching Improvements**:
+   - Implement multi-level caching
+   - Add cache warming mechanisms
+   - Optimize cache invalidation strategies
+
+3. **API Enhancements**:
+   - GraphQL support for flexible queries
+   - Streaming responses for large datasets
+   - Batch processing capabilities
 
 ## Troubleshooting
 
