@@ -1,3 +1,4 @@
+import math
 from typing import Dict, Any, Optional
 
 def extract_retail_price(data: Dict[str, Any]) -> Optional[float]:
@@ -11,6 +12,11 @@ def extract_retail_price(data: Dict[str, Any]) -> Optional[float]:
         if price is None:
             return None
             
-        return float(price)
+        if isinstance(price, bool):
+            raise ValueError('Price must be numeric')
+        value = float(price)
+        if not math.isfinite(value) or value < 0:
+            raise ValueError('Price must be finite and nonnegative')
+        return value
     except (TypeError, ValueError) as e:
         raise ValueError(f"Failed to extract retail price: {str(e)}")

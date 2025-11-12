@@ -45,7 +45,7 @@ def enrich_flight(flight_data: FlightData):
             "origin": flight_data.origin,
             "destination": flight_data.destination,
             "departure_time": make_aware(flight_data.departure_time),
-            "arrival_time": flight_data.arrival_time,
+            "arrival_time": make_aware(flight_data.arrival_time),
             "flight_numbers": flight_data.flight_numbers,
             "legs": [
                 {
@@ -53,7 +53,7 @@ def enrich_flight(flight_data: FlightData):
                 }
                 for leg in flight_data.legs
                     ],
-            "last_seen": flight_data.last_seen,
+            "last_seen": make_aware(flight_data.last_seen),
             "enriched": False,
             "retail_price": None,
         }
@@ -61,14 +61,20 @@ def enrich_flight(flight_data: FlightData):
 
     # Create a new EnrichmentTask record with a unique task_id
     task_id = str(uuid4())
-    EnrichmentTask.objects.create(
+    task = EnrichmentTask.objects.create(
         task_id=task_id,
         flight=flight,
         status='PENDING',
     )
 
     # Enqueue Celery task asynchronously with the task_id
-    celery_result = enrich_flight_task.apply_async(args=[flight.flight_id], task_id=task_id)
+    try:
+        celery_result = enrich_flight_task.apply_async(args=[flight.flight_id], task_id=task_id)
+    except Exception:
+        task.status = 'FAILURE'
+        task.result = {"error": "Unable to enqueue enrichment"}
+        task.save(update_fields=['status', 'result'])
+        raise HTTPException(status_code=503, detail="Unable to enqueue enrichment") from None
 
     return {"task_id": celery_result.id, "status": "PENDING"}
 

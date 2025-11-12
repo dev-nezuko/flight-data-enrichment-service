@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 # Third-party imports
 import httpx
-import pytest
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone

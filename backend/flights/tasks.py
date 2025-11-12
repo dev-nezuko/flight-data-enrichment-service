@@ -57,14 +57,14 @@ def enrich_flight_task(self, flight_id: str) -> Dict[str, Any]:
             "departure_id": flight.origin,
             "arrival_id": flight.destination,
             "outbound_date": flight.departure_time.strftime("%Y-%m-%d"),
-            "return_date": flight.arrival_time.strftime("%Y-%m-%d"),
+            "type": 2,
             "currency": "USD",
             "hl": "en",
             "api_key": SERPAPI_KEY
         }
 
         # Make API request with timeout and retries
-        with httpx.Client(timeout=200) as client:
+        with httpx.Client(timeout=30) as client:
             response = client.get("https://serpapi.com/search.json", params=params)
             response.raise_for_status()
             data = response.json()
@@ -96,20 +96,20 @@ def enrich_flight_task(self, flight_id: str) -> Dict[str, Any]:
         raise
 
     except httpx.HTTPError as e:
-        error_msg = f"HTTP error occurred: {str(e)}"
+        error_msg = "Flight price provider request failed"
         if self.request.retries >= self.max_retries:
             task_obj = EnrichmentTask.objects.get(task_id=self.request.id)
             task_obj.status = 'FAILURE'
             task_obj.result = {"error": error_msg}
             task_obj.completed_at = timezone.now()
             task_obj.save()
-        raise
+        raise RuntimeError(error_msg) from None
 
     except Exception as e:
-        error_msg = f"Error enriching flight data: {str(e)}"
+        error_msg = "Flight enrichment failed"
         task_obj = EnrichmentTask.objects.get(task_id=self.request.id)
         task_obj.status = 'FAILURE'
         task_obj.result = {"error": error_msg}
         task_obj.completed_at = timezone.now()
         task_obj.save()
-        raise
+        raise RuntimeError(error_msg) from None
