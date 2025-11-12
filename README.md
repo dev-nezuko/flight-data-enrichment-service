@@ -36,7 +36,7 @@ Before setting up the project, ensure you have the following installed:
 ## Project Structure
 
 ```
-flyflat_test/
+flight-task-system/
 ├── api/                # FastAPI application
 │   ├── main.py        # Main API entry point
 │   └── routes/        # API route handlers
